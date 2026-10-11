@@ -1,98 +1,66 @@
-# Opens a PR that copies a service's image (tag + digest) to the next environment:
-#   target stage: dev → stage, auto-merged once pr-checks pass
-#   target prod:  stage → prod, merged by a human (CODEOWNERS on envs/prod/)
-# Only the images: entry changes. Config is never promoted.
+# Promotion PRs: dev deploys automatically; stage and prod change only when a human merges a PR.
+#
+# Whenever dev or stage changes on main, this keeps one PR per service and target env in sync:
+#   promote/<service>-stage   dev   → stage   (merge = stage checkpoint)
+#   promote/<service>-prod    stage → prod    (merge = prod checkpoint; CODEOWNERS review on envs/prod/)
+# The PR always carries the newest candidate; it is closed automatically once the target runs it.
+# Run it manually to (re)create PRs for one service or env.
 name: promote
-run-name: promote ${{ inputs.service }} → ${{ inputs.target }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('promote {0} → {1}', inputs.service, inputs.target) || 'sync promotion PRs' }}
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - envs/dev/*/kustomization.yaml
+      - envs/stage/*/kustomization.yaml
   workflow_dispatch:
     inputs:
       service:
-        description: Service to promote
+        description: Service
         type: choice
-        options: [orders, catalog]
-        required: true
+        options: [all, orders, catalog]
+        default: all
       target:
-        description: Environment to promote to
+        description: Target environment
         type: choice
-        options: [stage, prod]
-        required: true
+        options: [all, stage, prod]
+        default: all
 
 permissions:
   contents: read
 
+# One reconciliation at a time; a newer run supersedes a pending one (it reads the latest main anyway)
 concurrency:
-  group: promote-${{ inputs.service }}-${{ inputs.target }}
+  group: promotion-prs
+  cancel-in-progress: false
 
 jobs:
-  promote:
+  sync:
     runs-on: ubuntu-latest
     steps:
-      # The PAT (not GITHUB_TOKEN) pushes and opens the PR, so pr-checks runs on it
+      # The PAT (not GITHUB_TOKEN) pushes and opens PRs, so pr-checks runs on them
       - uses: actions/checkout@v7
         with:
+          ref: main
           token: ${{ secrets.GITOPS_TOKEN }}
 
-      - name: Copy image
-        id: promote
-        env:
-          SERVICE: ${{ inputs.service }}
-          TARGET: ${{ inputs.target }}
-        run: |
-          if [[ $TARGET == stage ]]; then source_env=dev; else source_env=stage; fi
-          scripts/promote.sh "$SERVICE" "$source_env" "$TARGET"
-
-      - name: Nothing to promote
-        if: steps.promote.outputs.changed != 'true'
-        env:
-          TARGET: ${{ inputs.target }}
-          TAG: ${{ steps.promote.outputs.new_tag }}
-        run: echo "::notice::$TARGET already runs $TAG"
-
-      - name: Open pull request
-        if: steps.promote.outputs.changed == 'true'
+      - name: Sync promotion PRs
         env:
           GH_TOKEN: ${{ secrets.GITOPS_TOKEN }}
-          SERVICE: ${{ steps.promote.outputs.service }}
-          FROM: ${{ steps.promote.outputs.from }}
-          TO: ${{ steps.promote.outputs.to }}
-          OLD_TAG: ${{ steps.promote.outputs.old_tag }}
-          NEW_TAG: ${{ steps.promote.outputs.new_tag }}
-          DIGEST: ${{ steps.promote.outputs.digest }}
-          REPO: ${{ steps.promote.outputs.repo }}
+          SERVICE: ${{ inputs.service || 'all' }}
+          TARGET: ${{ inputs.target || 'all' }}
+          REQUESTED_BY: ${{ github.event_name == 'workflow_dispatch' && github.triggering_actor || '' }}
         run: |
-          branch="promote/$SERVICE-$TO-$NEW_TAG"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "$branch"
-          git commit -am "promote($SERVICE): $TO → $NEW_TAG"
-          git push --force -u origin "$branch"
-
-          if [[ $OLD_TAG == sha-* ]]; then
-            changes="https://github.com/$REPO/compare/${OLD_TAG#sha-}...${NEW_TAG#sha-}"
-          else
-            changes="https://github.com/$REPO/commits/${NEW_TAG#sha-}"
-          fi
-          body=$(cat <<EOF
-          Promotes **$SERVICE** from **$FROM** to **$TO**.
-
-          | | |
-          |---|---|
-          | From | \`$OLD_TAG\` |
-          | To | \`$NEW_TAG\` |
-          | Digest | \`$DIGEST\` (same artifact as in $FROM) |
-          | Changes | $changes |
-
-          Only the image changes; \`envs/$TO/$SERVICE/application.yaml\` is untouched.
-          EOF
-          )
-          url=$(gh pr create --base main --head "$branch" --title "promote($SERVICE): $TO → $NEW_TAG" --body "$body")
-          echo "### [$SERVICE → $TO]($url)" >> "$GITHUB_STEP_SUMMARY"
-
-          if [[ $TO == stage ]]; then
-            gh pr merge "$url" --auto --squash --delete-branch \
-              || echo "::warning::Could not enable auto-merge (enable it in the repo settings); merge $url manually"
-          else
-            echo "Prod promotion waits for review: $url" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          for dir in apps/*/; do
+            svc=$(basename "$dir")
+            [[ $SERVICE == all || $SERVICE == "$svc" ]] || continue
+            for pair in dev:stage stage:prod; do
+              from=${pair%:*} to=${pair#*:}
+              [[ $TARGET == all || $TARGET == "$to" ]] || continue
+              scripts/promotion-pr.sh "$svc" "$from" "$to" ${REQUESTED_BY:+--requested-by "$REQUESTED_BY"} \
+                | tee -a "$GITHUB_STEP_SUMMARY"
+            done
+          done

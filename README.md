@@ -53,7 +53,7 @@ override never takes traffic: the old pods keep serving and ArgoCD shows the app
 | Change a value in one env | Edit `envs/<env>/<service>/application.yaml`, open a PR |
 | Change a value for all services in one env | Edit `envs/<env>/application.yaml` |
 | Ship new code to dev | Merge to `main` in the service repo. CI commits the new image here |
-| Promote to stage / prod | Actions → **promote** → service + target. Opens a PR (stage auto-merges, prod needs review) |
+| Promote to stage / prod | Merge the open `promote(<service>): <env> → sha-…` PR. It's opened and kept current automatically |
 | Roll back | Revert the promotion (or config) commit. ArgoCD rolls back image and config together |
 | Scale | `replicas:` in `envs/<env>/<service>/kustomization.yaml` |
 | Add a secret | Store it in OpenBao under `secret/demo/<env>/<service>`, map it in `external-secret.yaml` |
@@ -93,8 +93,11 @@ orders.payment.provider-url      = https://api.payments.example               # 
 | Env | Arrives via | Gate |
 |---|---|---|
 | dev | Service CI commits `envs/dev/<service>` on every merge to `main` | Service tests |
-| stage | **promote** workflow PR (dev → stage) | `pr-checks`, then auto-merge |
-| prod | **promote** workflow PR (stage → prod) | `pr-checks` + CODEOWNERS review |
+| stage | Promotion PR `promote/<service>-stage`, opened automatically when dev changes | `pr-checks` + **human merge** |
+| prod | Promotion PR `promote/<service>-prod`, opened automatically when stage changes | `pr-checks` + **human merge** + CODEOWNERS review |
+
+Promotion PRs always carry the newest build of the source env and close themselves once the target runs it.
+Merging one is the checkpoint for that environment. To re-sync by hand: Actions → **promote** → Run workflow.
 
 Every PR gets a comment with the **rendered manifest diff**: exactly what ArgoCD will change.
 
@@ -107,7 +110,6 @@ Images start as the placeholder tag `bootstrap` (not pullable) until the first C
   to both service repos.
 - Ruleset on `main`: require a PR, require the `checks` status (from `pr-checks`), require code-owner review; allow
   the repository admin to bypass (service CI pushes dev bumps directly).
-- Settings → General → *Allow auto-merge*.
 - After the first CI run in each service repo: make the GHCR packages public.
 
 **Cluster (home lab)**
