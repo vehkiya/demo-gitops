@@ -1,11 +1,18 @@
+# Demo shortcut: orders gets its own LoadBalancer IP (homecluster: internal-lb-pool, announced over BGP), so the API
+# and actuator are reachable without port-forwards. Catalog stays internal (ClusterIP).
+# On EKS you'd keep ClusterIP and expose through a Gateway/Ingress instead of one load balancer per service.
 apiVersion: v1
 kind: Service
 metadata:
   name: orders
 spec:
+  type: LoadBalancer
   selector:
     app.kubernetes.io/name: orders
   ports:
     - name: http
       port: 8080
       targetPort: http
+    - name: management       # actuator: /actuator/info, /actuator/configsources (demo only)
+      port: 9000
+      targetPort: management
