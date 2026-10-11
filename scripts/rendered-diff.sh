@@ -10,13 +10,20 @@ max_chars=60000 # GitHub comments are limited to 65536 characters
 body=""
 changed=0
 while read -r app; do
-  diff=$(diff -u --label "base/$app" --label "pr/$app" "$base/$app" "$head/$app" 2>/dev/null || true)
+  # -N: an app that exists on one side only (added or removed) diffs against an empty file
+  diff=$(diff -uN --label "base/$app" --label "pr/$app" "$base/$app" "$head/$app" || true)
   [[ -n $diff ]] || continue
   changed=$((changed + 1))
+  note=""
+  if [[ ! -f $base/$app ]]; then note=" · new app"; fi
+  if [[ ! -f $head/$app ]]; then note=" · removed app"; fi
   added=$(grep -c '^+[^+]' <<< "$diff" || true)
   removed=$(grep -c '^-[^-]' <<< "$diff" || true)
-  body+=$'\n'"<details open><summary><b>${app%.yaml}</b> (+$added −$removed)</summary>"$'\n\n```diff\n'"$diff"$'\n```\n</details>\n'
-done < <( (cd "$base" && find . -name '*.yaml'; cd "$head" && find . -name '*.yaml') | sed 's#^\./##' | sort -u)
+  body+=$'\n'"<details open><summary><b>${app%.yaml}</b> (+$added −$removed$note)</summary>"$'\n\n```diff\n'"$diff"$'\n```\n</details>\n'
+done < <({
+  (cd "$base" && find . -name '*.yaml')
+  (cd "$head" && find . -name '*.yaml')
+} | sed 's#^\./##' | sort -u)
 
 echo "<!-- rendered-diff -->"
 echo "### Rendered manifest changes"
