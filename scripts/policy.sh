@@ -28,6 +28,9 @@ for file in "$rendered"/*/*.yaml; do
     pass "$where: no Secrets in Git"
   fi
 
+  # Only service apps have a Deployment; namespace-level apps (envs/<env>/baseline) stop here
+  [[ -n $("$YQ" 'select(.kind == "Deployment") | .metadata.name' "$file") ]] || continue
+
   # If the images: entry name doesn't match the container, the placeholder image would be deployed
   image=$("$YQ" 'select(.kind == "Deployment") | .spec.template.spec.containers[] | select(.name == "app") | .image' "$file")
   if [[ $image == */* ]]; then

@@ -21,3 +21,4 @@ spec:
     - { group: apps, kind: Deployment }
     - { group: policy, kind: PodDisruptionBudget }
     - { group: external-secrets.io, kind: ExternalSecret }
+    - { group: cilium.io, kind: CiliumNetworkPolicy }
