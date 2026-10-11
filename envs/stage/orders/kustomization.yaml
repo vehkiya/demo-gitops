@@ -14,5 +14,5 @@ replicas:
 configMapGenerator:
   - name: orders-config
     files:
-      - env.yaml=../application.yaml     # env-wide overrides (all services in stage)
-      - service.yaml=application.yaml    # orders overrides in stage
+      - env.yaml=../application.yaml # env-wide overrides (all services in stage)
+      - service.yaml=application.yaml # orders overrides in stage
