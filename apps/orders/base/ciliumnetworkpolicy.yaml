@@ -1,0 +1,18 @@
+# Lets traffic from outside the cluster reach the orders LoadBalancer (API + actuator).
+# Same entities as other exposed apps on homecluster; everything else stays default-deny.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: orders-ingress-from-lb
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: orders
+  ingress:
+    - fromEntities: [world, host, remote-node]
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+            - port: "9000"
+              protocol: TCP

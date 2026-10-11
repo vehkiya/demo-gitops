@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - deployment.yaml
   - service.yaml
+  - ciliumnetworkpolicy.yaml
 components:
   - ../../../components/spring-boot
 labels:

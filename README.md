@@ -24,7 +24,7 @@ envs/                              ← where almost every change happens
 ├── stage/                         same shape
 └── prod/                          same shape + pdb.yaml, 2 replicas
 
-apps/<service>/base/               how a service runs in any env (Deployment, Service)
+apps/<service>/base/               how a service runs in any env (Deployment, Service; orders: LoadBalancer)
 platform/namespace-baseline/       what every demo namespace gets: allow traffic between its pods
                                    (the cluster default-denies everything else)
 components/spring-boot/            golden path for every service: probes, ports, security, JVM flags, config wiring
@@ -128,10 +128,11 @@ Images start as the placeholder tag `bootstrap` (not pullable) until the first C
    namespace `argocd`. It creates the `demo` AppProject and the ApplicationSet, which creates the six apps
    (`<service>-<env>`).
 
-**Look at it** (no ingress):
+**Look at it:** orders has a LoadBalancer IP per environment (API `:8080`, actuator `:9000`). Catalog is internal.
 ```sh
-kubectl -n demo-stage port-forward svc/orders 8080:8080
-kubectl -n demo-stage port-forward deploy/orders 9000:9000   # /actuator/info, /actuator/configsources
+ip=$(kubectl -n demo-stage get svc orders -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+curl -s "$ip:8080/api/orders" -H 'content-type: application/json' -d '{"items":[{"sku":"BOOK-001","quantity":2}]}'
+curl -s "$ip:9000/actuator/configsources"
 ```
 
 **On EKS:** set `cluster` and `namespace` in each `env.yaml`, adjust the AppProject destinations, and point the
