@@ -1,0 +1,16 @@
+# The cluster default-denies all traffic (ccnp-global-default-deny). For the demo, every pod in the namespace may
+# talk to every other pod in the same namespace; traffic to/from other namespaces stays denied.
+# DNS egress, probes and kubectl port-forward are allowed cluster-wide by other policies.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-within-namespace
+spec:
+  description: "GitOps demo: allow all traffic between pods in this namespace"
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - {}
+  egress:
+    - toEndpoints:
+        - {}

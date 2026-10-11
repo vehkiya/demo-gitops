@@ -1,0 +1,5 @@
+# Namespace-level resources every demo environment gets. Included by envs/<env>/baseline.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ciliumnetworkpolicy.yaml

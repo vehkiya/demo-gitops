@@ -13,6 +13,7 @@ envs/                              ← where almost every change happens
 ├── dev/
 │   ├── env.yaml                   cluster, namespace, autoSync (read by the ApplicationSet)
 │   ├── application.yaml           Spring overrides for ALL services in dev
+│   ├── baseline/                  namespace-level resources (CiliumNetworkPolicy), app baseline-dev
 │   ├── catalog/
 │   │   ├── kustomization.yaml     image (set by CI), replicas, ConfigMap generator
 │   │   └── application.yaml       catalog overrides in dev
@@ -24,6 +25,8 @@ envs/                              ← where almost every change happens
 └── prod/                          same shape + pdb.yaml, 2 replicas
 
 apps/<service>/base/               how a service runs in any env (Deployment, Service)
+platform/namespace-baseline/       what every demo namespace gets: allow traffic between its pods
+                                   (the cluster default-denies everything else)
 components/spring-boot/            golden path for every service: probes, ports, security, JVM flags, config wiring
 argocd/                            AppProject + ApplicationSet (bootstrap)
 scripts/                           render, compare, promote, check
