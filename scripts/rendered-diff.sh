@@ -20,7 +20,10 @@ while read -r app; do
   added=$(grep -c '^+[^+]' <<< "$diff" || true)
   removed=$(grep -c '^-[^-]' <<< "$diff" || true)
   body+=$'\n'"<details open><summary><b>${app%.yaml}</b> (+$added −$removed$note)</summary>"$'\n\n```diff\n'"$diff"$'\n```\n</details>\n'
-done < <( (cd "$base" && find . -name '*.yaml') ; (cd "$head" && find . -name '*.yaml') ) | sed 's#^\./##' | sort -u)
+done < <({
+  (cd "$base" && find . -name '*.yaml')
+  (cd "$head" && find . -name '*.yaml')
+} | sed 's#^\./##' | sort -u)
 
 echo "<!-- rendered-diff -->"
 echo "### Rendered manifest changes"
