@@ -6,12 +6,13 @@ images:
   # Updated by CI (dev) and the promote workflow (stage, prod). Don't edit by hand.
   - name: catalog
     newName: ghcr.io/vehkiya/demo-catalog-service
-    newTag: bootstrap
+    newTag: sha-22a6831
+    digest: sha256:f18d5e73d30f00449a0c5ef391bc6b9f71568e62c8daaf3b432904ab48e0711b
 replicas:
   - name: catalog
     count: 1
 configMapGenerator:
   - name: catalog-config
     files:
-      - env.yaml=../application.yaml     # env-wide overrides (all services in dev)
-      - service.yaml=application.yaml    # catalog overrides in dev
+      - env.yaml=../application.yaml # env-wide overrides (all services in dev)
+      - service.yaml=application.yaml # catalog overrides in dev
