@@ -7,12 +7,13 @@ images:
   # Updated by CI (dev) and the promote workflow (stage, prod). Don't edit by hand.
   - name: orders
     newName: ghcr.io/vehkiya/demo-orders-service
-    newTag: bootstrap
+    newTag: sha-478ff39
+    digest: sha256:92614e165df843eb09695258dbfdac6c86f86c72b0d904de678978b899ca2394
 replicas:
   - name: orders
     count: 1
 configMapGenerator:
   - name: orders-config
     files:
-      - env.yaml=../application.yaml     # env-wide overrides (all services in dev)
-      - service.yaml=application.yaml    # orders overrides in dev
+      - env.yaml=../application.yaml # env-wide overrides (all services in dev)
+      - service.yaml=application.yaml # orders overrides in dev
