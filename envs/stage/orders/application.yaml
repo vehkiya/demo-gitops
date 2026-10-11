@@ -1,0 +1,8 @@
+# Only what differs from the defaults in demo-orders-service/src/main/resources/application.yaml
+orders:
+  max-items-per-order: 3
+  catalog:
+    timeout: 1s
+  payment:
+    mode: sandbox
+    provider-url: https://sandbox.payments.example

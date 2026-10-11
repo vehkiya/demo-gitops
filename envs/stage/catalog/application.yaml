@@ -1,0 +1,5 @@
+# Only what differs from the defaults in demo-catalog-service/src/main/resources/application.yaml
+catalog:
+  banner: STAGE catalog
+  discount:
+    enabled: true

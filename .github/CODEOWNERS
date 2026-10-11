@@ -1,0 +1,3 @@
+# Prod changes need a review from the release owners. In an org: /envs/prod/ @<org>/release-managers
+# Require "Review from Code Owners" in the main branch ruleset for this to be enforced.
+/envs/prod/  @vehkiya

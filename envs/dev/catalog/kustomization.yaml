@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../apps/catalog/base
+images:
+  # Updated by CI (dev) and the promote workflow (stage, prod). Don't edit by hand.
+  - name: catalog
+    newName: ghcr.io/vehkiya/demo-catalog-service
+    newTag: bootstrap
+replicas:
+  - name: catalog
+    count: 1
+configMapGenerator:
+  - name: catalog-config
+    files:
+      - env.yaml=../application.yaml     # env-wide overrides (all services in dev)
+      - service.yaml=application.yaml    # catalog overrides in dev

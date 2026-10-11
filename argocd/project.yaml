@@ -1,0 +1,23 @@
+# Fences the demo in: one source repo, three namespaces, a short list of resource kinds.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: demo
+  namespace: argocd
+spec:
+  description: GitOps delivery demo (catalog + orders)
+  sourceRepos:
+    - https://github.com/vehkiya/demo-gitops.git
+  destinations:
+    # EKS: one entry per cluster instead, e.g. { server: https://<prod-eks-endpoint>, namespace: demo }
+    - { server: https://kubernetes.default.svc, namespace: demo-dev }
+    - { server: https://kubernetes.default.svc, namespace: demo-stage }
+    - { server: https://kubernetes.default.svc, namespace: demo-prod }
+  clusterResourceWhitelist:
+    - { group: "", kind: Namespace }
+  namespaceResourceWhitelist:
+    - { group: "", kind: ConfigMap }
+    - { group: "", kind: Service }
+    - { group: apps, kind: Deployment }
+    - { group: policy, kind: PodDisruptionBudget }
+    - { group: external-secrets.io, kind: ExternalSecret }

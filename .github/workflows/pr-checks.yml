@@ -1,0 +1,51 @@
+# Runs on every PR (promotions and config changes alike):
+#   1. render every envs/<env>/<service> (fails if Kustomize fails)
+#   2. post the rendered-manifest diff vs main as a PR comment
+#   3. policy checks (no Secrets, prod pinned by digest, prod >= 2 replicas)
+name: pr-checks
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Render this PR
+        run: scripts/render-all.sh "$RUNNER_TEMP/rendered/head"
+
+      - name: Render base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          git worktree add "$RUNNER_TEMP/base-src" "origin/$BASE_REF"
+          # This PR's scripts on the base branch's content, so both sides render the same way
+          ROOT="$RUNNER_TEMP/base-src" scripts/render-all.sh "$RUNNER_TEMP/rendered/base"
+
+      - name: Comment rendered diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          scripts/rendered-diff.sh "$RUNNER_TEMP/rendered/base" "$RUNNER_TEMP/rendered/head" > "$RUNNER_TEMP/comment.md"
+          cat "$RUNNER_TEMP/comment.md" >> "$GITHUB_STEP_SUMMARY"
+          # One sticky comment per PR, updated on every push
+          id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.body | startswith("<!-- rendered-diff -->")) | .id' | head -n1)
+          if [[ -n $id ]]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$RUNNER_TEMP/comment.md" > /dev/null
+          else
+            gh pr comment "$PR" --body-file "$RUNNER_TEMP/comment.md"
+          fi
+
+      - name: Policy checks
+        run: scripts/policy.sh "$RUNNER_TEMP/rendered/head"

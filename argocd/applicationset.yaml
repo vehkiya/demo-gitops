@@ -1,0 +1,52 @@
+# One Application per (environment × service): envs/<env>/env.yaml × envs/<env>/<service>/
+# Adding a service = adding a folder. Adding an environment = adding envs/<env>/ with an env.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: demo
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - git:
+              repoURL: https://github.com/vehkiya/demo-gitops.git
+              revision: main
+              files:
+                - path: envs/*/env.yaml
+          - git:
+              repoURL: https://github.com/vehkiya/demo-gitops.git
+              revision: main
+              pathParamPrefix: svc
+              directories:
+                - path: "envs/{{ .env }}/*"
+  template:
+    metadata:
+      name: "{{ .svc.path.basename }}-{{ .env }}"
+      labels:
+        demo/env: "{{ .env }}"
+        demo/service: "{{ .svc.path.basename }}"
+    spec:
+      project: demo
+      source:
+        repoURL: https://github.com/vehkiya/demo-gitops.git
+        targetRevision: main
+        path: "{{ .svc.path.path }}"
+      destination:
+        server: "{{ .cluster }}"
+        namespace: "{{ .namespace }}"
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=true
+  # Environments with autoSync: true deploy every merged commit. Set it to false in an env.yaml
+  # to require a manual "Sync" in ArgoCD for that environment.
+  templatePatch: |
+    {{- if .autoSync }}
+    spec:
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+    {{- end }}

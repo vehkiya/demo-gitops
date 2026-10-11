@@ -1,0 +1,3 @@
+# Applies to every service in this environment. Plain Spring Boot properties.
+demo:
+  environment: stage

@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../apps/orders/base
+  - external-secret.yaml
+images:
+  # Updated by CI (dev) and the promote workflow (stage, prod). Don't edit by hand.
+  - name: orders
+    newName: ghcr.io/vehkiya/demo-orders-service
+    newTag: bootstrap
+replicas:
+  - name: orders
+    count: 1
+configMapGenerator:
+  - name: orders-config
+    files:
+      - env.yaml=../application.yaml     # env-wide overrides (all services in dev)
+      - service.yaml=application.yaml    # orders overrides in dev

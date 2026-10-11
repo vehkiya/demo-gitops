@@ -1,0 +1,11 @@
+# How orders runs, in any environment. Versions and config overrides live in envs/<env>/orders/.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - deployment.yaml
+  - service.yaml
+components:
+  - ../../../components/spring-boot
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: demo

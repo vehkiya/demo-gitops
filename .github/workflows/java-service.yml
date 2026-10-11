@@ -1,0 +1,130 @@
+# Golden path for Java services, called from each service repo's ci.yml:
+#   pull request:   test
+#   push to main:   test → image (Jib) → provenance attestation → commit the new image to envs/dev/<service>
+# ArgoCD then deploys dev. Stage and prod are promoted with the promote workflow.
+name: java-service
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        description: Service name, as in envs/<env>/<service> (e.g. orders)
+        type: string
+        required: true
+      image:
+        description: Image repository without tag (e.g. ghcr.io/vehkiya/demo-orders-service)
+        type: string
+        required: true
+      java-version:
+        type: string
+        default: "25"
+      gitops-repo:
+        description: GitOps repository (defaults to <owner>/demo-gitops)
+        type: string
+        default: ""
+    secrets:
+      gitops-token:
+        description: Token with contents:write on the GitOps repository
+        required: true
+
+jobs:
+  build:
+    name: test · image · deploy to dev
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    # Serialize dev deployments per service; PR builds run in parallel
+    concurrency:
+      group: ${{ github.event_name == 'push' && format('deploy-dev-{0}', inputs.service) || github.run_id }}
+      cancel-in-progress: false
+    env:
+      DEPLOY: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+          cache: maven
+
+      - name: Test
+        run: ./mvnw -B verify
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: target/surefire-reports/
+
+      - name: Build and push image
+        id: image
+        if: env.DEPLOY == 'true'
+        env:
+          IMAGE: ${{ inputs.image }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="sha-${GITHUB_SHA::7}"
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
+          ./mvnw -B jib:build -Dimage="$IMAGE:$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "digest=$(cat target/jib-image.digest)" >> "$GITHUB_OUTPUT"
+
+      - name: Attest build provenance
+        if: env.DEPLOY == 'true'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-name: ${{ inputs.image }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+
+      - name: Check out GitOps repository
+        if: env.DEPLOY == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.gitops-repo || format('{0}/demo-gitops', github.repository_owner) }}
+          token: ${{ secrets.gitops-token }}
+          path: gitops
+
+      - name: Deploy to dev
+        if: env.DEPLOY == 'true'
+        working-directory: gitops
+        env:
+          SERVICE: ${{ inputs.service }}
+          TAG: ${{ steps.image.outputs.tag }}
+          REF: ${{ inputs.image }}:${{ steps.image.outputs.tag }}@${{ steps.image.outputs.digest }}
+        run: |
+          scripts/promote.sh --set "$SERVICE" dev "$REF"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "deploy($SERVICE): dev → $TAG" \
+            -m "Source: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$GITHUB_SHA"
+          # Another service may have pushed in the meantime; their change touches a different file
+          for attempt in 1 2 3 4 5; do
+            if git push; then exit 0; fi
+            echo "push rejected (attempt $attempt), rebasing"
+            git pull --rebase
+          done
+          exit 1
+
+      - name: Summary
+        if: env.DEPLOY == 'true'
+        env:
+          SERVICE: ${{ inputs.service }}
+          IMAGE: ${{ inputs.image }}
+          TAG: ${{ steps.image.outputs.tag }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          {
+            echo "### Deployed $SERVICE to dev"
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Image | \`$IMAGE:$TAG\` |"
+            echo "| Digest | \`$DIGEST\` |"
+            echo "| Next | ArgoCD syncs \`$SERVICE-dev\`; promote with the **promote** workflow in demo-gitops |"
+          } >> "$GITHUB_STEP_SUMMARY"

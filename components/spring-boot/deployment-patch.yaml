@@ -1,0 +1,72 @@
+# Applied to every Deployment by target selector (the name below is ignored).
+# Convention: the application container is named "app".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: any
+spec:
+  revisionHistoryLimit: 3
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0           # a new pod must be Ready before an old one goes away
+  template:
+    spec:
+      terminationGracePeriodSeconds: 30
+      # Kubernetes otherwise injects ORDERS_SERVICE_HOST, CATALOG_PORT, ... for every Service in the namespace.
+      # Spring maps those to orders.service.host etc., which the strict properties (ignoreUnknownFields = false)
+      # would reject at startup. Services are found through DNS anyway.
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          env:
+            # Platform contract: uniform ports so probes and Services look the same for every service
+            - name: SERVER_PORT
+              value: "8080"
+            - name: MANAGEMENT_SERVER_PORT
+              value: "9000"
+            # Overrides from the ConfigMap: env-wide first, then service-specific (later file wins)
+            - name: SPRING_CONFIG_ADDITIONAL_LOCATION
+              value: optional:file:/config/env.yaml,optional:file:/config/service.yaml
+            - name: LOGGING_STRUCTURED_FORMAT_CONSOLE
+              value: ecs
+            - name: JAVA_TOOL_OPTIONS
+              value: -XX:MaxRAMPercentage=75 -XX:+UseCompactObjectHeaders -XX:+ExitOnOutOfMemoryError
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: management
+              containerPort: 9000
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            periodSeconds: 2
+            failureThreshold: 60      # up to 2 minutes to start
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            periodSeconds: 5
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

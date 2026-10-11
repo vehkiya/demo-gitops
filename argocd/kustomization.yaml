@@ -1,0 +1,6 @@
+# Bootstrap: applied by the demo-gitops Application in homelab-k8s (apps/gitops/app-of-apps/demo-gitops.yaml)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - project.yaml
+  - applicationset.yaml

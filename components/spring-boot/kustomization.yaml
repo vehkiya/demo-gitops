@@ -1,0 +1,8 @@
+# The golden path: everything every Spring Boot service gets, regardless of environment.
+# Only patches, no named resources, so it can be included by any number of services.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - path: deployment-patch.yaml
+    target:
+      kind: Deployment

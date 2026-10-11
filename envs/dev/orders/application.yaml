@@ -1,0 +1,7 @@
+# Only what differs from the defaults in demo-orders-service/src/main/resources/application.yaml
+orders:
+  express-shipping:
+    enabled: true
+  payment:
+    mode: sandbox
+    provider-url: https://sandbox.payments.example

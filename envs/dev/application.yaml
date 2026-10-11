@@ -1,0 +1,6 @@
+# Applies to every service in this environment. Plain Spring Boot properties.
+demo:
+  environment: dev
+logging:
+  level:
+    app.kerrlab.demo: DEBUG
