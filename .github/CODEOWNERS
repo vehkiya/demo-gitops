@@ -1,3 +1,7 @@
-# Prod changes need a review from the release owners. In an org: /envs/prod/ @<org>/release-managers
-# Require "Review from Code Owners" in the main branch ruleset for this to be enforced.
+# Merging a promotion PR is the checkpoint for that environment. Enforced by "Require review from Code Owners"
+# in the main ruleset. In an org, point these at teams:
+#   /envs/stage/  @<org>/qa
+#   /envs/prod/   @<org>/release-managers
+# Demo (single account): stage has no owner, so merging is the checkpoint; prod needs the admin bypass, because
+# GitHub doesn't let the PR author (the PAT owner) approve their own PR.
 /envs/prod/  @vehkiya
