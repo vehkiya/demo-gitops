@@ -7,8 +7,8 @@ images:
   # Updated by CI (dev) and the promote workflow (stage, prod). Don't edit by hand.
   - name: orders
     newName: ghcr.io/vehkiya/demo-orders-service
-    newTag: sha-478ff39
-    digest: sha256:92614e165df843eb09695258dbfdac6c86f86c72b0d904de678978b899ca2394
+    newTag: sha-66e7443
+    digest: sha256:64bf5ecc39fba376baf0a7974e62e48bbb16d1c38f6dd7a9b7a35b568d360e29
 replicas:
   - name: orders
     count: 1
